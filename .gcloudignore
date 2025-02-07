@@ -1,0 +1,20 @@
+#dev directories
+venv/
+__pycache__/
+
+#git files
+.git
+.gitignore
+
+#sh files
+deploy.sh
+deploy-to-gcp.sh
+deploy-to-gcp.sh.sample
+
+docker-compose.yml
+
+.env.production
+.env.development
+.env
+
+*.json
