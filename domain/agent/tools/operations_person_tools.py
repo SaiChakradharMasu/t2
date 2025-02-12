@@ -21,7 +21,7 @@ class OperationsPersonTools(AgentTools):
             storage_client = storage.Client()
             bucket = storage_client.bucket(bucket_name)
             blob = bucket.get_blob(source_blob_name)
-            self.system_instructions = blob.download_as_string().decode('utf-8')
+            self.system_instructions = blob.download_as_string().decode('utf-8') + "If user ask for the his role then tell him that you are a operations person"
             
             return True
 

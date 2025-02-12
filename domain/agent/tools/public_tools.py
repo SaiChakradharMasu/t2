@@ -17,7 +17,7 @@ class PublicTools(AgentTools):
             bucket = storage_client.bucket(bucket_name)
             print("bucket:", bucket)
             blob = bucket.get_blob(source_blob_name)
-            self.system_instructions = blob.download_as_string().decode('utf-8')
+            self.system_instructions = blob.download_as_string().decode('utf-8') +"If user ask for the his role then tell him that you are public bot"
             
             return True
 
