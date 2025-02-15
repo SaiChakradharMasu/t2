@@ -71,44 +71,100 @@ class SellerTools(AgentTools):
             bucket = storage_client.bucket(bucket_name)
             blob = bucket.get_blob(source_blob_name)
             extra_instruction = """
-            If user ask for the his role then tell him that you are a seller
-            Answer role 
-                        Role-Based Supported Queries (Seller)
+Eric - Masu Chatbot Interaction Guidelines
+Purpose
+Eric is a private chatbot for logged-in users within the Masu ecosystem. It adapts responses based on the user's role and provides assistance by retrieving relevant data from the system. Eric maintains a friendly, professional, and engaging tone, offering responses in English or Spanish based on the user's language preference. If a user's question lacks necessary details, Eric will ask follow-up questions to gather the required information before proceeding.
+General Interaction Guidelines
+1. Welcome Message
+If the user interacts for the first time in a session, Eric greets them with:
+“Welcome to Masu! My name is Eric. How can I assist you today?”
+(No mention of capabilities unless asked.)
+2. Query Handling
+	•	Eric never preemptively lists all supported queries.
+	•	If the user asks about their role, Eric responds:
+	•	“You are a Seller.” (No additional details unless asked.)
+	•	If a query lacks required details, Eric asks clarifying questions before proceeding.
+	•	If a query is ambiguous (e.g., multiple possible answers), Eric suggests relevant options.
+Seller-Specific Query Handling
+1. Creating an Order
+	•	If the user requests order creation (e.g., “Create an order for customer-id product-id presentation quantity target price”), Eric verifies all required details.
+	•	If any information is missing, Eric asks:
+	•	“I can create the order for you. Could you provide [missing detail]?”
+	•	Once all details are collected, Eric processes the order.
+	•	Eric only confirms order creation when the order is successfully created.
+	•	Example response (only if successful): “Your order has been successfully created!”
+	•	No full payload or unnecessary data should be displayed.
+2. Other Supported Queries (Only Mentioned When Relevant)
+	•	Inventory Creation. 
+If a Seller asks something unsupported, Eric gently redirects:
+“I'm sorry, I can't assist with that request. However, I can help with Order creation and Inventory Creation. Let me know how I can assist you!”
 
-            Eric supports the following queries for Sellers and dynamically provides assistance based on these queries:
-                1.	Checking Price Requests
-                •	Example: “What's the status of my price request for [product name] for [customer name]?”
-                2.	Order History
-                •	Example: “Show me the order history for [customer name] in the last quarter.”
-                3.	Top-Selling Products
-                •	Example: “What are the top 5 selling products in [product category] this month?”
-                4.	Customer Contact Information
-                •	Example: “What's the contact information for [customer name]?”
-                5.	Pending Payments
-                •	Example: “Is there any pending payment from [customer name]?”
-
-            Query Handling for Sellers
-                •	If a query lacks details, Eric will prompt for missing information.
-            Example:
-            User: “What's the status of my price request?”
-            Eric: “Could you specify the product name and customer name for the request?”
-                •	If the user provides incomplete or incorrect details, Eric will ask for clarification.
-            Example:
-            Eric: “I couldn't find any data with the details provided. Could you verify the product name or customer name and try again?”
-
-            Guidance for Out-of-Scope Questions
-                •	If a Seller asks an unsupported question, Eric will redirect them to relevant queries:
-            Example:
-            Eric: “I'm sorry, I can't assist with that request. However, I can help with checking price requests, order history, and pending payments. Let me know how I can assist you!"""
-            self.system_instructions = blob.download_as_string().decode('utf-8')+ extra_instruction
-            print(self.system_instructions)
+"""
+            self.system_instructions =  extra_instruction #blob.download_as_string().decode('utf-8')+
             return True
 
         except Exception as e:
             print("Error:", e)
             return False
-    import requests
+    def get_system_instructions(self) -> str:
+        return self.system_instructions
 
+    def create_inventory(self, lot, quantity, reception_date, packing_type, product_id, warehouse_id):
+        """
+        Function to send a POST request to create an inventory entry.
+
+        :param lot: str, Unique identifier for the inventory lot
+        :param quantity: int, Quantity of the product being added to inventory
+        :param price: float, Price per unit of the product
+        :param product_id: str, Unique identifier for the product
+        :param warehouse_id: str, Unique identifier for the warehouse
+        :param reception_date: str, Date when the inventory was received (YYYY-MM-DD)
+        :param packing_type: str, Packaging type of the product
+        :param certification_coa: str, Optional URL for certification document (default: None)
+        :param batch_id: str, Optional batch identifier (default: None)
+        :return: dict, API response as JSON
+        """
+
+        # API Endpoint
+        url = "https://staging.masu-api.com/api/inventory"
+
+        # Headers
+        headers = {
+            "accept": "application/json",
+            "X-Tenant-ID": "masu",
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.token}"
+        }
+
+        # Payload with required fields and optional fields
+        payload = {
+            "lot": lot,
+            "quantity": quantity,
+            "price": 1,
+            "batchId": "",
+            "certificationCoa":"https://masu-bucket-dev.s3.amazonaws.com/tenants/masu/inventory/329b5449-fd83-4b2c-bd97-3ba191f087a4/certifications-910827/teachnical_specifications.pdf",
+            "receptionDate": reception_date,
+            "packingType": packing_type,
+            "productId": product_id,
+            "warehouseId": warehouse_id
+        }
+        # Making the POST request
+        response = requests.post(url, headers=headers, json=payload)
+        print(response)
+        # Returning response JSON with error handling
+        try:
+            return response.json()
+        except json.JSONDecodeError:
+            return {"error": "Invalid JSON response", "status_code": response.status_code, "response": response.text}
+
+    def fc_create_inventory(self,  lot:int, quantity:int ,reception_date: str, packing_type:str, product_id:str, warehouse_id:str):
+        "Returns the inventory order creation results back"
+        response = self.create_inventory(lot, quantity,reception_date, packing_type, product_id, warehouse_id)
+        if response['statusCode'] == 400:
+            return "Inventry created succesfully"
+        else:
+            return response
+    
     def create_direct_order(self, customer_id, product_id, presentation, quantity, target_price):
         """
         Function to send a POST request to create an order with required fields and optional fields as null.
@@ -172,7 +228,7 @@ class SellerTools(AgentTools):
             return response.json()
         except json.JSONDecodeError:
             return {"error": "Invalid JSON response", "status_code": response.status_code, "response": response.text}
-        
+    
     def fc_find_customer_by_id1(self,company_id: str) -> dict:
         """
         Finds customer details using a unique company ID.
@@ -185,24 +241,6 @@ class SellerTools(AgentTools):
         """
         return self.PRODUCT_DATA.get(product_id, {"exists": False})
 
-    """    def create_order(self, customer_id: str, product_id: str, presentation: str, quantity: int, target_price: str, price: str) -> dict:
-
-        order_data = {
-            "customer id": customer_id,
-            "products": product,
-            "expected delivery": expected_delivery_start_date,
-            "payment type": payment_type,
-            "quantity" : quantity,
-            "price" : price,
-            "delivery type": delivery_type
-        }
-        print(order_data)
-        return {
-            "message": "Order successfully created!",
-            "order_details": f'customer id={customer_id}' ,
-            "Prompt": "Just say order created successfully and the order detials should be exactly as I send, dont take the one in the memeory"
-
-        }"""
     def fc_create_order(self, customer_id: str, product_id: str, presentation: str, quantity: int, target_price: str) -> str:
         """Returns the order details when asked to create the order"""
         print(customer_id, product_id, quantity, presentation, quantity, target_price)
@@ -224,15 +262,7 @@ class SellerTools(AgentTools):
         if y == 0:
             return "Entered cutomer and product id are not in the system, kindly reenter"
         else:
-            return order
-        if company_id != "111":
-            self.system_instructions+"As the company id worng get the company name and pass it through in the company id order creation "
-            return "Entered company id is wrong, kindly enter the correct company id or the company name"
-
-        else:
-            return company_id, product_id, quantity, price, expected_delivery_start_date, payment_type, payment_type, delivery_type
-    def get_system_instructions(self) -> str:
-        return self.system_instructions
+            return "Order created successfuly"
 
     def get_name_tools(self) -> list:
         """Returns the list of function callings.
